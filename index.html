@@ -256,21 +256,39 @@ const media={
   Lifestyle:['lifestyle','g3','g4','g5'],
   TVC:'tvc','360°':'spin'};
 let curMedia='Product';
-function renderGallery(){
-  const tr=$('#galTrack'), th=$('#thumbs'); tr.innerHTML=''; th.innerHTML='';
+/* Image groups share one continuous track: swiping past the last Product
+   slide lands on Details, then Lifestyle; the active tab follows the swipe. */
+const GROUPS=['Product','Details','Lifestyle'];
+const flat=[];GROUPS.forEach(g=>media[g].forEach((k,i)=>flat.push({g,k,i})));
+const groupStart=g=>flat.findIndex(s=>s.g===g);
+let flatBuilt=false,curGroup=null;
+function setChip(name){[...$('#mediaTabs').children].forEach(c=>{const on=c.textContent===name;c.classList.toggle('on',on);if(on)c.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'})})}
+function buildThumbs(g,active){const tr=$('#galTrack'),th=$('#thumbs');th.innerHTML='';th.style.display='flex';
+  media[g].forEach((k,i)=>{const b=document.createElement('button');b.innerHTML='<img src="'+A+k+'.jpg" alt="">';if(i===active)b.classList.add('on');
+    b.onclick=()=>tr.scrollTo({left:(groupStart(g)+i)*tr.clientWidth,behavior:'smooth'});th.appendChild(b)})}
+function renderFlat(g,smooth){
+  const tr=$('#galTrack'),th=$('#thumbs');
+  if(!flatBuilt){tr.innerHTML='';
+    flat.forEach((s,idx)=>{const d=document.createElement('div');d.innerHTML=(idx===0?'<span class="badge">PRE-ORDER</span>':'')+(s.i===0&&idx>0?'<span class="badge" style="background:#0B0B0C">'+s.g.toUpperCase()+'</span>':'')+'<img src="'+A+s.k+'.jpg" alt="">';tr.appendChild(d)});
+    tr.onscroll=()=>{const i=Math.min(flat.length-1,Math.round(tr.scrollLeft/tr.clientWidth));const s=flat[i];
+      if(s.g!==curGroup){curGroup=s.g;curMedia=s.g;setChip(s.g);buildThumbs(s.g,s.i)}
+      else[...th.children].forEach((b,j)=>b.classList.toggle('on',j===s.i))};
+    flatBuilt=true}
+  curGroup=g;buildThumbs(g,0);
+  tr.scrollTo({left:groupStart(g)*tr.clientWidth,behavior:smooth?'smooth':'auto'});
+}
+function renderGallery(smooth){
+  const tr=$('#galTrack'), th=$('#thumbs');
+  if(GROUPS.includes(curMedia)){renderFlat(curMedia,smooth);return}
+  flatBuilt=false;curGroup=null;tr.onscroll=null;tr.innerHTML='';th.innerHTML='';
   const m=media[curMedia];
   if(m==='tvc'){tr.innerHTML='<div><span class="badge">PRE-ORDER</span><div class="ph"><svg width="64" height="64" viewBox="0 0 72 72"><circle cx="36" cy="36" r="36" fill="#fff"/><path d="M29 24l20 12-20 12z" fill="#0B0B0C"/></svg>[P16 TVC · tap to play]</div></div>';th.style.display='none';tr.firstChild.onclick=()=>toast('Plays the P16 TVC');return}
   if(m==='spin'){const frames=['g1','g5','g3','g4'];let i=0;tr.innerHTML='<div class="spin"><span class="badge">360°</span><img src="'+A+frames[0]+'.jpg" alt="360 view"></div>';th.style.display='none';
     const box=tr.firstChild,img=box.querySelector('img');let x0=null;const step=d=>{i=(i+d+frames.length)%frames.length;img.src=A+frames[i]+'.jpg'};
     box.addEventListener('pointerdown',e=>{x0=e.clientX;box.setPointerCapture(e.pointerId)});box.addEventListener('pointermove',e=>{if(x0===null)return;if(Math.abs(e.clientX-x0)>40){step(e.clientX>x0?1:-1);x0=e.clientX}});box.addEventListener('pointerup',()=>x0=null);
     toast('Drag to rotate (demo)');return}
-  th.style.display='flex';
-  m.forEach((k,i)=>{const d=document.createElement('div');d.innerHTML=(i===0?'<span class="badge">PRE-ORDER</span>':'')+'<img src="'+A+k+'.jpg" alt="">';tr.appendChild(d);
-    const b=document.createElement('button');b.innerHTML='<img src="'+A+k+'.jpg" alt="">';if(i===0)b.classList.add('on');b.onclick=()=>tr.scrollTo({left:i*tr.clientWidth,behavior:'smooth'});th.appendChild(b)});
-  tr.onscroll=()=>{const i=Math.round(tr.scrollLeft/tr.clientWidth);[...th.children].forEach((b,j)=>b.classList.toggle('on',i===j))};
-  tr.scrollLeft=0;
 }
-Object.keys(media).forEach(k=>{const b=document.createElement('button');b.className='chip'+(k===curMedia?' on':'');b.textContent=k;b.onclick=()=>{curMedia=k;[...$('#mediaTabs').children].forEach(c=>c.classList.toggle('on',c===b));renderGallery()};$('#mediaTabs').appendChild(b)});
+Object.keys(media).forEach(k=>{const b=document.createElement('button');b.className='chip'+(k===curMedia?' on':'');b.textContent=k;b.onclick=()=>{curMedia=k;setChip(k);renderGallery(flatBuilt&&GROUPS.includes(k))};$('#mediaTabs').appendChild(b)});
 renderGallery();
 
 /* ---------- Packages / add-ons / qty ---------- */
